@@ -44,34 +44,34 @@ export default function EpubToAudioConverter() {
       try {
         setConverting(true);
 
-        // Create file path using just the email and filename
+        // Upload epub to books folder
         const filePath = `${user.email}/books/${file.name}`;
-        console.log("filePath", filePath);
-
-        // Upload to Supabase storage
-        const { data, error } = await supabase.storage
+        const { error: uploadError } = await supabase.storage
           .from("books")
           .upload(filePath, file, {
             cacheControl: "3600",
             upsert: false,
           });
 
-        if (error) {
-          throw error;
-        }
+        if (uploadError) throw uploadError;
 
-        // Create a record in the database to track the conversion
-        // const { error: dbError } = await supabase.from("conversions").insert({
-        //   user_id: user.id,
-        //   file_path: filePath,
-        //   original_filename: file.name,
-        //   status: "pending",
-        //   created_at: new Date().toISOString(),
-        // });
+        // Get the demo audio file from public URL
+        const audioResponse = await fetch("/audio.mp3");
+        const audioBlob = await audioResponse.blob();
 
-        // if (dbError) {
-        //   throw dbError;
-        // }
+        // Upload demo audio to audiobooks folder
+        const audioPath = `${user.email}/audiobooks/${file.name.replace(
+          ".epub",
+          ".mp3"
+        )}`;
+        const { error: audioError } = await supabase.storage
+          .from("books")
+          .upload(audioPath, audioBlob, {
+            cacheControl: "3600",
+            upsert: false,
+          });
+
+        if (audioError) throw audioError;
 
         router.push("/dashboard");
       } catch (error) {
