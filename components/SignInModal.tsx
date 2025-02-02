@@ -22,10 +22,23 @@ export function SignInModal({ open, onOpenChange, file }: SignInModalProps) {
   const handleGoogleSignIn = async () => {
     try {
       setIsLoading(true);
-      const { data } = await supabase.auth.signInWithOAuth({
+      // Store file info before auth
+      if (file) {
+        const reader = new FileReader();
+        reader.onload = async () => {
+          const base64data = reader.result?.toString().split(",")[1];
+          if (base64data) {
+            localStorage.setItem("pendingFile", file.name);
+            localStorage.setItem("pendingFileData", base64data);
+          }
+        };
+        reader.readAsDataURL(file);
+      }
+
+      await supabase.auth.signInWithOAuth({
         provider: "google",
         options: {
-          redirectTo: `${window.location.origin}/?file=${file?.name}`,
+          redirectTo: `${window.location.origin}`,
         },
       });
     } catch (error) {

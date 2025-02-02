@@ -63,8 +63,9 @@ export default function EpubToAudioConverter() {
     if (user) {
       try {
         setConverting(true);
-        // Redirect to dashboard immediately
-        router.push("/dashboard");
+
+        // Redirect to dashboard immediately with the new book name
+        router.push(`/dashboard?newBook=${encodeURIComponent(file.name)}`);
 
         // Upload epub to books folder
         const filePath = `${user.email}/books/${file.name}`;

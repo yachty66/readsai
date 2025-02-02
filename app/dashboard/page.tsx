@@ -19,6 +19,21 @@ export default function Dashboard() {
     new Set()
   );
 
+  // Listen for new book uploads via URL parameters
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const newBook = params.get("newBook");
+
+    if (newBook) {
+      // Add the new book to the list immediately
+      setBooks((prev) => [...prev, { name: newBook }]);
+      setConvertingBooks((prev) => new Set(prev).add(newBook));
+
+      // Clean up URL
+      router.replace("/dashboard", undefined, { shallow: true });
+    }
+  }, [router]);
+
   const fetchBooks = async (userEmail: string) => {
     const { data: booksData, error: booksError } = await supabase.storage
       .from("books")
@@ -38,9 +53,13 @@ export default function Dashboard() {
             search: book.name.replace(".epub", ".mp3"),
           });
 
-        const hasAudio = audioData && audioData.length > 0;
-        if (!hasAudio) {
-          setConvertingBooks((prev) => new Set(prev).add(book.name));
+        if (audioData && audioData.length > 0) {
+          // Remove from converting state if audio exists
+          setConvertingBooks((prev) => {
+            const newSet = new Set(prev);
+            newSet.delete(book.name);
+            return newSet;
+          });
         }
         return book;
       })
@@ -48,6 +67,19 @@ export default function Dashboard() {
 
     setBooks(booksWithAudioStatus || []);
   };
+
+  // Add polling for conversion status
+  useEffect(() => {
+    if (convertingBooks.size > 0) {
+      const interval = setInterval(() => {
+        if (user?.email) {
+          fetchBooks(user.email);
+        }
+      }, 2000); // Check every 2 seconds
+
+      return () => clearInterval(interval);
+    }
+  }, [convertingBooks, user?.email]);
 
   useEffect(() => {
     const checkAuth = async () => {
