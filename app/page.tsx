@@ -3,10 +3,12 @@
 import { useState } from "react";
 import { Upload, FileText, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { SignInModal } from "@/components/SignInModal";
 
 export default function EpubToAudioConverter() {
   const [file, setFile] = useState<File | null>(null);
   const [converting, setConverting] = useState(false);
+  const [showSignInModal, setShowSignInModal] = useState(false);
 
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFile = event.target.files?.[0];
@@ -23,10 +25,8 @@ export default function EpubToAudioConverter() {
 
   const handleConvert = async () => {
     if (!file) return;
-    setConverting(true);
-    // Simulating conversion process
-    await new Promise((resolve) => setTimeout(resolve, 3000));
-    setConverting(false);
+    console.log("Opening sign in modal");
+    setShowSignInModal(true);
   };
 
   return (
@@ -98,6 +98,8 @@ export default function EpubToAudioConverter() {
           {converting ? "Converting..." : "Convert to Audio"}
         </Button>
       </div>
+
+      <SignInModal open={showSignInModal} onOpenChange={setShowSignInModal} />
     </div>
   );
 }
