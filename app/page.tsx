@@ -1,14 +1,28 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Upload, FileText, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { SignInModal } from "@/components/SignInModal";
+import { supabase } from "@/lib/supabase";
+import { useRouter } from "next/navigation";
 
 export default function EpubToAudioConverter() {
   const [file, setFile] = useState<File | null>(null);
   const [converting, setConverting] = useState(false);
   const [showSignInModal, setShowSignInModal] = useState(false);
+  const [user, setUser] = useState<any>(null);
+  const router = useRouter();
+
+  useEffect(() => {
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_, session) => {
+      setUser(session?.user ?? null);
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
 
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFile = event.target.files?.[0];
@@ -25,8 +39,16 @@ export default function EpubToAudioConverter() {
 
   const handleConvert = async () => {
     if (!file) return;
-    console.log("Opening sign in modal");
-    setShowSignInModal(true);
+
+    if (user) {
+      // User is signed in, proceed with conversion
+      setConverting(true);
+      // Add your conversion logic here
+      router.push("/dashboard");
+    } else {
+      // User is not signed in, show sign-in modal
+      setShowSignInModal(true);
+    }
   };
 
   return (
