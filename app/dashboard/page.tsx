@@ -46,7 +46,8 @@ export default function Dashboard() {
     if (!user) return;
 
     const audioFileName = bookName.replace(".epub", ".mp3");
-    const audioPath = `${user.email}/audiobooks/${audioFileName}`;
+    const audioPath = `${user.email}/audiobook/${audioFileName}`;
+    console.log("audioPath", audioPath);
 
     const { data, error } = await supabase.storage
       .from("books")
@@ -57,6 +58,7 @@ export default function Dashboard() {
       alert("Audio file not ready yet");
       return;
     }
+
 
     // Create download link
     const url = window.URL.createObjectURL(data);
