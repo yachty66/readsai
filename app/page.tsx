@@ -41,12 +41,45 @@ export default function EpubToAudioConverter() {
     if (!file) return;
 
     if (user) {
-      // User is signed in, proceed with conversion
-      setConverting(true);
-      // Add your conversion logic here
-      router.push("/dashboard");
+      try {
+        setConverting(true);
+
+        // Create a unique file path using user's email and timestamp
+        const filePath = `${user.email}/${Date.now()}-${file.name}`;
+        console.log("filePath", filePath);
+        // Upload to Supabase storage
+        const { data, error } = await supabase.storage
+          .from("books") // Create this bucket in Supabase
+          .upload(filePath, file, {
+            cacheControl: "3600",
+            upsert: false,
+          });
+
+        if (error) {
+          throw error;
+        }
+
+        // Create a record in the database to track the conversion
+        // const { error: dbError } = await supabase.from("conversions").insert({
+        //   user_id: user.id,
+        //   file_path: filePath,
+        //   original_filename: file.name,
+        //   status: "pending",
+        //   created_at: new Date().toISOString(),
+        // });
+
+        // if (dbError) {
+        //   throw dbError;
+        // }
+
+        router.push("/dashboard");
+      } catch (error) {
+        console.error("Error during upload:", error);
+        alert("Failed to upload file. Please try again.");
+      } finally {
+        setConverting(false);
+      }
     } else {
-      // User is not signed in, show sign-in modal
       setShowSignInModal(true);
     }
   };
