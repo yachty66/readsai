@@ -24,15 +24,16 @@ export default function Dashboard() {
     const params = new URLSearchParams(window.location.search);
     const newBook = params.get("newBook");
 
-    if (newBook) {
-      // Add the new book to the list immediately
-      setBooks((prev) => [...prev, { name: newBook }]);
-      setConvertingBooks((prev) => new Set(prev).add(newBook));
-
+    if (newBook && user?.email) {
+      // Check if book already exists in the list
+      if (!books.some((book) => book.name === newBook)) {
+        setBooks((prev) => [...prev, { name: newBook }]);
+        setConvertingBooks((prev) => new Set(prev).add(newBook));
+      }
       // Clean up URL
       router.replace("/dashboard", undefined, { shallow: true });
     }
-  }, [router]);
+  }, [router, books, user]);
 
   const fetchBooks = async (userEmail: string) => {
     const { data: booksData, error: booksError } = await supabase.storage
@@ -44,9 +45,15 @@ export default function Dashboard() {
       return;
     }
 
+    // Filter out duplicates based on name
+    const uniqueBooks = booksData?.filter(
+      (book, index, self) =>
+        index === self.findIndex((b) => b.name === book.name)
+    );
+
     // Check which books have audio available
     const booksWithAudioStatus = await Promise.all(
-      (booksData || []).map(async (book) => {
+      (uniqueBooks || []).map(async (book) => {
         const { data: audioData } = await supabase.storage
           .from("books")
           .list(`${userEmail}/audiobooks`, {
@@ -54,7 +61,6 @@ export default function Dashboard() {
           });
 
         if (audioData && audioData.length > 0) {
-          // Remove from converting state if audio exists
           setConvertingBooks((prev) => {
             const newSet = new Set(prev);
             newSet.delete(book.name);
