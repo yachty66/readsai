@@ -44,12 +44,13 @@ export default function EpubToAudioConverter() {
       try {
         setConverting(true);
 
-        // Create a unique file path using user's email and timestamp
-        const filePath = `${user.email}/${Date.now()}-${file.name}`;
+        // Create file path using just the email and filename
+        const filePath = `${user.email}/books/${file.name}`;
         console.log("filePath", filePath);
+
         // Upload to Supabase storage
         const { data, error } = await supabase.storage
-          .from("books") // Create this bucket in Supabase
+          .from("books")
           .upload(filePath, file, {
             cacheControl: "3600",
             upsert: false,
