@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { Button } from "@/components/ui/button";
-import { FileText, Plus } from "lucide-react";
+import { FileText, Plus, Download } from "lucide-react";
 
 interface Book {
   name: string;
@@ -42,6 +42,33 @@ export default function Dashboard() {
     checkAuth();
   }, [router]);
 
+  const handleDownloadAudio = async (bookName: string) => {
+    if (!user) return;
+
+    const audioFileName = bookName.replace(".epub", ".mp3");
+    const audioPath = `${user.email}/audiobooks/${audioFileName}`;
+
+    const { data, error } = await supabase.storage
+      .from("books")
+      .download(audioPath);
+
+    if (error) {
+      console.error("Error downloading audio:", error);
+      alert("Audio file not ready yet");
+      return;
+    }
+
+    // Create download link
+    const url = window.URL.createObjectURL(data);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = audioFileName;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    window.URL.revokeObjectURL(url);
+  };
+
   return (
     <div className="flex h-[calc(100vh-4rem)]">
       {/* Sidebar */}
@@ -71,9 +98,16 @@ export default function Dashboard() {
                 <div className="w-32 h-48 border border-white/10 rounded-lg mb-4 flex items-center justify-center">
                   <FileText className="w-12 h-12 text-white/40" />
                 </div>
-                <p className="text-white text-center font-medium">
+                <p className="text-white text-center font-medium mb-4">
                   {book.name}
                 </p>
+                <Button
+                  onClick={() => handleDownloadAudio(book.name)}
+                  className="w-full bg-white text-black hover:bg-black hover:text-white hover:border-white border transition-all"
+                >
+                  <Download className="w-4 h-4" />
+                  Download Audio
+                </Button>
               </div>
             ))}
           </div>
