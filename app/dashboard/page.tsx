@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { Button } from "@/components/ui/button";
-import { FileText, Plus, Download } from "lucide-react";
+import { FileText, Plus, Download, Loader2 } from "lucide-react";
 
 interface Book {
   name: string;
@@ -15,6 +15,39 @@ export default function Dashboard() {
   const router = useRouter();
   const [books, setBooks] = useState<Book[]>([]);
   const [user, setUser] = useState<any>(null);
+  const [convertingBooks, setConvertingBooks] = useState<Set<string>>(
+    new Set()
+  );
+
+  const fetchBooks = async (userEmail: string) => {
+    const { data: booksData, error: booksError } = await supabase.storage
+      .from("books")
+      .list(`${userEmail}/books`);
+
+    if (booksError) {
+      console.error("Error fetching books:", booksError);
+      return;
+    }
+
+    // Check which books have audio available
+    const booksWithAudioStatus = await Promise.all(
+      (booksData || []).map(async (book) => {
+        const { data: audioData } = await supabase.storage
+          .from("books")
+          .list(`${userEmail}/audiobooks`, {
+            search: book.name.replace(".epub", ".mp3"),
+          });
+
+        const hasAudio = audioData && audioData.length > 0;
+        if (!hasAudio) {
+          setConvertingBooks((prev) => new Set(prev).add(book.name));
+        }
+        return book;
+      })
+    );
+
+    setBooks(booksWithAudioStatus || []);
+  };
 
   useEffect(() => {
     const checkAuth = async () => {
@@ -26,28 +59,31 @@ export default function Dashboard() {
         return;
       }
       setUser(session.user);
-
-      const { data, error } = await supabase.storage
-        .from("books")
-        .list(`${session.user.email}/books`);
-
-      if (error) {
-        console.error("Error fetching books:", error);
-        return;
-      }
-
-      setBooks(data || []);
+      await fetchBooks(session.user.email);
     };
 
     checkAuth();
-  }, [router]);
+
+    // Subscribe to storage changes
+    const channel = supabase
+      .channel("storage-changes")
+      .on("postgres_changes", { event: "*", schema: "storage" }, () => {
+        if (user?.email) {
+          fetchBooks(user.email);
+        }
+      })
+      .subscribe();
+
+    return () => {
+      channel.unsubscribe();
+    };
+  }, [router, user?.email]);
 
   const handleDownloadAudio = async (bookName: string) => {
     if (!user) return;
 
     const audioFileName = bookName.replace(".epub", ".mp3");
-    const audioPath = `${user.email}/audiobook/${audioFileName}`;
-    console.log("audioPath", audioPath);
+    const audioPath = `${user.email}/audiobooks/${audioFileName}`;
 
     const { data, error } = await supabase.storage
       .from("books")
@@ -55,12 +91,9 @@ export default function Dashboard() {
 
     if (error) {
       console.error("Error downloading audio:", error);
-      alert("Audio file not ready yet");
       return;
     }
 
-
-    // Create download link
     const url = window.URL.createObjectURL(data);
     const link = document.createElement("a");
     link.href = url;
@@ -71,6 +104,26 @@ export default function Dashboard() {
     window.URL.revokeObjectURL(url);
   };
 
+  const checkAudioExists = async (bookName: string) => {
+    if (!user) return false;
+
+    const audioFileName = bookName.replace(".epub", ".mp3");
+    const audioPath = `${user.email}/audiobooks/${audioFileName}`;
+
+    try {
+      const { data } = await supabase.storage
+        .from("books")
+        .list(`${user.email}/audiobooks`, {
+          search: audioFileName,
+        });
+
+      return data && data.length > 0;
+    } catch (error) {
+      console.error("Error checking audio:", error);
+      return false;
+    }
+  };
+
   return (
     <div className="flex h-[calc(100vh-4rem)]">
       {/* Sidebar */}
@@ -79,7 +132,7 @@ export default function Dashboard() {
           className="w-full bg-white text-black hover:bg-black hover:text-white hover:border-white border transition-all"
           onClick={() => router.push("/")}
         >
-          <Plus className="w-4 h-4" />
+          <Plus className="w-4 h-4 mr-2" />
           New Conversion
         </Button>
       </div>
@@ -87,33 +140,38 @@ export default function Dashboard() {
       {/* Main Content */}
       <div className="flex-1 bg-black p-8 overflow-y-auto">
         <h1 className="text-2xl font-bold text-white mb-8">Your Books</h1>
-
-        {books.length === 0 ? (
-          <div className="text-white/60">No books yet</div>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {books.map((book) => (
-              <div
-                key={book.name}
-                className="border border-white/10 rounded-lg p-6 flex flex-col items-center hover:border-white/30 transition-all"
-              >
-                <div className="w-32 h-48 border border-white/10 rounded-lg mb-4 flex items-center justify-center">
-                  <FileText className="w-12 h-12 text-white/40" />
-                </div>
-                <p className="text-white text-center font-medium mb-4">
-                  {book.name}
-                </p>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {books.map((book) => (
+            <div
+              key={book.name}
+              className="border border-white/10 rounded-lg p-6 flex flex-col items-center hover:border-white/30 transition-all"
+            >
+              <div className="w-32 h-48 border border-white/10 rounded-lg mb-4 flex items-center justify-center">
+                <FileText className="w-12 h-12 text-white/40" />
+              </div>
+              <p className="text-white text-center font-medium mb-4">
+                {book.name}
+              </p>
+              {convertingBooks.has(book.name) ? (
+                <Button
+                  disabled
+                  className="w-full bg-white/10 text-white border border-white/10"
+                >
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Converting...
+                </Button>
+              ) : (
                 <Button
                   onClick={() => handleDownloadAudio(book.name)}
                   className="w-full bg-white text-black hover:bg-black hover:text-white hover:border-white border transition-all"
                 >
-                  <Download className="w-4 h-4" />
+                  <Download className="w-4 h-4 mr-2" />
                   Download Audio
                 </Button>
-              </div>
-            ))}
-          </div>
-        )}
+              )}
+            </div>
+          ))}
+        </div>
       </div>
     </div>
   );

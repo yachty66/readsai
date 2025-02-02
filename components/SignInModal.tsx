@@ -12,36 +12,20 @@ import { useRouter } from "next/navigation";
 interface SignInModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  file?: File;
 }
 
-export function SignInModal({ open, onOpenChange }: SignInModalProps) {
+export function SignInModal({ open, onOpenChange, file }: SignInModalProps) {
   const [isLoading, setIsLoading] = useState(false);
   const router = useRouter();
-
-  // Add auth state change listener
-  useEffect(() => {
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange((event) => {
-      if (event === "SIGNED_IN") {
-        router.push("/dashboard");
-        onOpenChange(false); // Close the modal after successful sign in
-      }
-    });
-
-    return () => subscription.unsubscribe();
-  }, [router, onOpenChange]);
 
   const handleGoogleSignIn = async () => {
     try {
       setIsLoading(true);
-      const redirectTo =
-        process.env.NEXT_PUBLIC_SITE_URL || window.location.origin;
-
-      await supabase.auth.signInWithOAuth({
+      const { data } = await supabase.auth.signInWithOAuth({
         provider: "google",
         options: {
-          redirectTo: `${redirectTo}/dashboard`,
+          redirectTo: `${window.location.origin}/?file=${file?.name}`,
         },
       });
     } catch (error) {

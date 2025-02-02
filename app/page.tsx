@@ -15,10 +15,30 @@ export default function EpubToAudioConverter() {
   const router = useRouter();
 
   useEffect(() => {
+    // Check for stored file data after authentication
+    const storedFileName = localStorage.getItem("pendingFile");
+    const storedFileData = localStorage.getItem("pendingFileData");
+
+    if (storedFileName && storedFileData) {
+      const blob = new Blob([Buffer.from(storedFileData, "base64")], {
+        type: "application/epub+zip",
+      });
+      const file = new File([blob], storedFileName, {
+        type: "application/epub+zip",
+      });
+      setFile(file);
+      // Clear storage
+      localStorage.removeItem("pendingFile");
+      localStorage.removeItem("pendingFileData");
+    }
+
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((_, session) => {
+    } = supabase.auth.onAuthStateChange(async (event, session) => {
       setUser(session?.user ?? null);
+      if (event === "SIGNED_IN" && file) {
+        handleConvert();
+      }
     });
 
     return () => subscription.unsubscribe();
@@ -43,6 +63,8 @@ export default function EpubToAudioConverter() {
     if (user) {
       try {
         setConverting(true);
+        // Redirect to dashboard immediately
+        router.push("/dashboard");
 
         // Upload epub to books folder
         const filePath = `${user.email}/books/${file.name}`;
@@ -55,25 +77,18 @@ export default function EpubToAudioConverter() {
 
         if (uploadError) throw uploadError;
 
-        // Get the demo audio file from public URL
+        // Get and upload the demo audio file in the background
         const audioResponse = await fetch("/audio.mp3");
         const audioBlob = await audioResponse.blob();
 
-        // Upload demo audio to audiobooks folder
         const audioPath = `${user.email}/audiobooks/${file.name.replace(
           ".epub",
           ".mp3"
         )}`;
-        const { error: audioError } = await supabase.storage
-          .from("books")
-          .upload(audioPath, audioBlob, {
-            cacheControl: "3600",
-            upsert: false,
-          });
-
-        if (audioError) throw audioError;
-
-        router.push("/dashboard");
+        await supabase.storage.from("books").upload(audioPath, audioBlob, {
+          cacheControl: "3600",
+          upsert: false,
+        });
       } catch (error) {
         console.error("Error during upload:", error);
         alert("Failed to upload file. Please try again.");
@@ -81,6 +96,16 @@ export default function EpubToAudioConverter() {
         setConverting(false);
       }
     } else {
+      // Store file data before opening sign-in modal
+      const reader = new FileReader();
+      reader.onload = () => {
+        const base64data = reader.result?.toString().split(",")[1];
+        if (base64data) {
+          localStorage.setItem("pendingFile", file.name);
+          localStorage.setItem("pendingFileData", base64data);
+        }
+      };
+      reader.readAsDataURL(file);
       setShowSignInModal(true);
     }
   };
@@ -155,7 +180,11 @@ export default function EpubToAudioConverter() {
         </Button>
       </div>
 
-      <SignInModal open={showSignInModal} onOpenChange={setShowSignInModal} />
+      <SignInModal
+        open={showSignInModal}
+        onOpenChange={setShowSignInModal}
+        file={file}
+      />
     </div>
   );
 }
