@@ -1,13 +1,12 @@
 "use client";
 
 import { useState } from "react";
-import { Upload, Headphones, FileText, X } from "lucide-react";
+import { Upload, FileText, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 export default function EpubToAudioConverter() {
   const [file, setFile] = useState<File | null>(null);
   const [converting, setConverting] = useState(false);
-  const [audioUrl, setAudioUrl] = useState<string | null>(null);
 
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFile = event.target.files?.[0];
@@ -28,7 +27,6 @@ export default function EpubToAudioConverter() {
     // Simulating conversion process
     await new Promise((resolve) => setTimeout(resolve, 3000));
     setConverting(false);
-    setAudioUrl("/sample-audio.mp3"); // Replace with actual converted audio URL
   };
 
   return (
@@ -99,19 +97,6 @@ export default function EpubToAudioConverter() {
         >
           {converting ? "Converting..." : "Convert to Audio"}
         </Button>
-
-        {audioUrl && (
-          <div className="text-center">
-            <a
-              href={audioUrl}
-              download
-              className="inline-flex items-center text-lg text-white hover:underline"
-            >
-              <Headphones className="w-6 h-6 mr-2" />
-              Download Audio
-            </a>
-          </div>
-        )}
       </div>
     </div>
   );
