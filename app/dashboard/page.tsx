@@ -51,7 +51,7 @@ export default function Dashboard() {
         index === self.findIndex((b) => b.name === book.name)
     );
 
-    // Check which books have audio available
+    // Check which books have audio available and upload if needed
     const booksWithAudioStatus = await Promise.all(
       (uniqueBooks || []).map(async (book) => {
         const { data: audioData } = await supabase.storage
@@ -60,12 +60,31 @@ export default function Dashboard() {
             search: book.name.replace(".epub", ".mp3"),
           });
 
-        if (audioData && audioData.length > 0) {
-          setConvertingBooks((prev) => {
-            const newSet = new Set(prev);
-            newSet.delete(book.name);
-            return newSet;
-          });
+        if (!audioData || audioData.length === 0) {
+          setConvertingBooks((prev) => new Set(prev).add(book.name));
+
+          // Start audio conversion if not already exists
+          const audioResponse = await fetch("/audio.mp3");
+          const audioBlob = await audioResponse.blob();
+          const audioPath = `${userEmail}/audiobooks/${book.name.replace(
+            ".epub",
+            ".mp3"
+          )}`;
+
+          try {
+            await supabase.storage.from("books").upload(audioPath, audioBlob, {
+              cacheControl: "3600",
+              upsert: false,
+            });
+            // Remove from converting state after successful upload
+            setConvertingBooks((prev) => {
+              const newSet = new Set(prev);
+              newSet.delete(book.name);
+              return newSet;
+            });
+          } catch (error) {
+            console.error("Error uploading audio:", error);
+          }
         }
         return book;
       })
