@@ -1,12 +1,14 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { Button } from "@/components/ui/button";
 
 export default function Dashboard() {
   const router = useRouter();
+  const [books, setBooks] = useState<any[]>([]);
+  const [user, setUser] = useState<any>(null);
 
   useEffect(() => {
     const checkAuth = async () => {
@@ -15,7 +17,21 @@ export default function Dashboard() {
       } = await supabase.auth.getSession();
       if (!session) {
         router.push("/");
+        return;
       }
+      setUser(session.user);
+
+      // Fetch books from storage
+      const { data, error } = await supabase.storage
+        .from("books")
+        .list(`${session.user.email}/books`);
+
+      if (error) {
+        console.error("Error fetching books:", error);
+        return;
+      }
+
+      setBooks(data || []);
     };
 
     checkAuth();
@@ -38,7 +54,17 @@ export default function Dashboard() {
                 New Conversion
               </Button>
             </div>
-            <p className="text-gray-400">No conversions yet</p>
+            {books.length === 0 ? (
+              <p className="text-gray-400">No conversions yet</p>
+            ) : (
+              <div className="space-y-4">
+                {books.map((book) => (
+                  <div key={book.name} className="p-4 bg-gray-800 rounded-lg">
+                    <p className="font-medium">{book.name}</p>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         </div>
       </div>
